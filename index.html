@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ===== Link preview: edit these lines (chat apps read them, not config.txt) ===== -->
+<title>A letter for you</title>
+<meta name="description" content="Someone wrote you a letter. Tap to open.">
+<meta property="og:title" content="A letter for you 💌">
+<meta property="og:description" content="Someone wrote you a letter. Tap to open.">
+<meta property="og:type" content="website">
+<!-- ============================================================================= -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Satisfy&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+<style>
+  :root {
+    --ink: #1f2a5a;
+    --sheet: #fbf6ea;
+    --bg: #e9e2d3;
+    --env: #e8d9bd;
+    --env-dark: #d9c6a2;
+    --seal: #9e1b22;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(circle at 50% 0%, #f4efe4 0%, var(--bg) 70%);
+    font-family: 'Satisfy', 'Ma Shan Zheng', cursive;
+    color: var(--ink);
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Envelope scene ---------- */
+  #scene {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; z-index: 10; cursor: pointer;
+    transition: opacity .6s ease .1s;
+  }
+  #scene.gone { opacity: 0; pointer-events: none; }
+  .envelope {
+    position: relative;
+    width: min(340px, 84vw); aspect-ratio: 1.55;
+    perspective: 900px;
+    filter: drop-shadow(0 14px 22px rgba(60, 40, 10, .22));
+    animation: float 3.2s ease-in-out infinite;
+  }
+  #scene.opening .envelope { animation: none; }
+  .env-back, .env-front, .env-flap, .env-paper { position: absolute; inset: 0; }
+  .env-back { background: var(--env-dark); border-radius: 6px; }
+  .env-paper {
+    left: 7%; right: 7%; top: 8%; bottom: 8%;
+    background: var(--sheet);
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    transition: transform .9s cubic-bezier(.3,.8,.3,1) .55s;
+  }
+  #scene.opening .env-paper { transform: translateY(-62%); }
+  .env-front {
+    background: var(--env);
+    clip-path: polygon(0 0, 50% 55%, 100% 0, 100% 100%, 0 100%);
+    border-radius: 6px;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 6%;
+    z-index: 2;
+  }
+  .env-front .to { font-size: clamp(22px, 7vw, 30px); color: #5a4630; white-space: nowrap; }
+  .env-flap {
+    bottom: auto; height: 58%;
+    background: linear-gradient(180deg, #efe3cb, var(--env));
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: top center;
+    z-index: 3;
+    transition: transform .55s ease-in, z-index 0s linear .28s;
+  }
+  #scene.opening .env-flap { transform: rotateX(180deg); z-index: 0; }
+  .seal {
+    position: absolute; left: 50%; top: 56%;
+    width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    z-index: 4;
+  }
+  .seal span {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #d0434a, var(--seal) 60%, #6e0f14);
+    box-shadow: 0 2px 4px rgba(0,0,0,.3), inset 0 0 0 4px rgba(0,0,0,.12);
+    display: flex; align-items: center; justify-content: center;
+    color: #f3c9c9; font-size: 24px; font-family: serif;
+    transition: transform .5s ease-in, opacity .5s ease-in;
+  }
+  .seal .l { clip-path: polygon(0 0, 54% 0, 44% 35%, 56% 60%, 46% 100%, 0 100%); }
+  .seal .r { clip-path: polygon(54% 0, 100% 0, 100% 100%, 46% 100%, 56% 60%, 44% 35%); }
+  #scene.opening .seal .l { transform: translate(-30px, 70px) rotate(-40deg); opacity: 0; }
+  #scene.opening .seal .r { transform: translate(30px, 70px) rotate(40deg); opacity: 0; }
+  .hint {
+    font-size: 22px; color: #7a6650; letter-spacing: .5px;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  #scene.opening .hint { opacity: 0; transition: opacity .2s; animation: none; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  @keyframes pulse { 50% { opacity: .45; } }
+
+  /* ---------- Letter ---------- */
+  #letter {
+    font-size: clamp(16px, 4.4vw, 24px);
+    width: min(720px, 100% - 24px);
+    margin: 24px auto 120px;
+    padding: 2.2em clamp(16px, 6vw, 56px) 2.6em;
+    background-color: var(--sheet);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 32px rgba(70, 50, 20, .16);
+    opacity: 0; transform: translateY(30px);
+    transition: opacity .7s ease, transform .7s ease;
+    cursor: pointer;
+  }
+  #letter.paper {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .35  0 0 0 0 .2  0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      radial-gradient(ellipse at center, transparent 55%, rgba(150, 110, 50, .10) 100%);
+  }
+  #letter.shown { opacity: 1; transform: none; }
+  .line { min-height: var(--H); line-height: 0; }
+  .line.right { text-align: right; }
+  .line.blank { min-height: calc(var(--H) * .5); }
+  .tok {
+    display: inline-block; vertical-align: top;
+    height: var(--H); position: relative;
+  }
+  .tok svg.word { display: block; overflow: visible; }
+  .tok svg.word path { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .tok.han .box { position: absolute; left: 0; }
+  .tok.glyph {
+    line-height: 1;
+    display: inline-flex; align-items: flex-end; justify-content: center;
+    opacity: 0;
+  }
+  .tok.emoji { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; transform: scale(0); }
+  .tok.emoji.play { animation: pop .45s cubic-bezier(.34, 1.7, .64, 1) forwards; }
+  .tok.text.play { animation: fadein .35s ease forwards; }
+  .tok.glyph.done { animation: none; opacity: 1; transform: none; }
+  @keyframes pop { 0% { opacity: 0; transform: scale(0); } 30% { opacity: 1; } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes fadein { to { opacity: 1; } }
+
+  #replay {
+    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    font: 22px 'Satisfy', cursive; color: #fff;
+    background: var(--ink); border: 0; border-radius: 999px;
+    padding: 10px 26px; box-shadow: 0 6px 18px rgba(0,0,0,.2);
+    transition: opacity .5s, transform .5s; cursor: pointer;
+  }
+  #replay.shown { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #msg { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; font: 18px/1.5 system-ui, sans-serif; color: #5a4630; }
+  #msg.shown { display: flex; }
+  #measure { position: absolute; left: -9999px; top: 0; visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div id="scene" aria-label="Tap to open the letter" role="button">
+  <div class="envelope">
+    <div class="env-back"></div>
+    <div class="env-paper"></div>
+    <div class="env-front"><span class="to" id="to"></span></div>
+    <div class="env-flap"></div>
+    <div class="seal"><span class="l">♥</span><span class="r">♥</span></div>
+  </div>
+  <div class="hint" id="hint">Tap to open</div>
+</div>
+
+<main id="letter" aria-live="polite"></main>
+<button id="replay">Replay ↺</button>
+<div id="msg"></div>
+<svg id="measure" xmlns="http://www.w3.org/2000/svg"></svg>
+
+<script>
+(() => {
+  // ---------- Constants ----------
+  const VARA_FONTS = {
+    satisfy: 'https://cdn.jsdelivr.net/npm/vara@1.4.1/fonts/Satisfy/SatisfySL.json',
+    parisienne: 'https://cdn.jsdelivr.net/npm/vara@1.4.1/fonts/Parisienne/Parisienne.json',
+    pacifico: 'https://cdn.jsdelivr.net/npm/vara@1.4.1/fonts/Pacifico/PacificoSLO.json',
+    shadowsintolight: 'https://cdn.jsdelivr.net/npm/vara@1.4.1/fonts/Shadows-Into-Light/shadows-into-light.json',
+  };
+  const HANZI_DATA = c => `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${encodeURIComponent(c)}.json`;
+
+  // Look and timing (time values are in ms at speed 1.0)
+  const EM_PER_UNIT = 0.072;   // size of English font units in em
+  const STROKE = 1.5;          // English pen width in font units
+  const PEN_SPEED = 0.65;      // English font units drawn per ms
+  const HAN_SIZE = 0.64;       // Chinese character size, as part of the line height
+  const GAP_WORD = 110, GAP_HAN = 50, GAP_LINE = 320, GAP_EMOJI = 120;
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const $ = id => document.getElementById(id);
+  const letter = $('letter'), scene = $('scene');
+
+  let settings = {}, speed = 1, font, glyphs = {}, metrics, hanData = {};
+  let tokens = [];
+  let skip = false, skipResolve, skipPromise, playing = false;
+
+  // ---------- Config ----------
+  function parseConfig(raw) {
+    raw = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    const settings = {};
+    let body = raw;
+    const sep = raw.match(/^---[ \t]*$/m);
+    if (sep) {
+      raw.slice(0, sep.index).split('\n').forEach(l => {
+        const m = l.match(/^\s*([\w-]+)\s*:\s*(.*?)\s*$/);
+        if (m) settings[m[1].toLowerCase()] = m[2];
+      });
+      body = raw.slice(sep.index + sep[0].length).replace(/^\n/, '');
+    }
+    return { settings, body: body.replace(/\s+$/, '') };
+  }
+
+  // ---------- Tokenizer ----------
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  const isHan = g => /^\p{Script=Han}$/u.test(g);
+  const isEmoji = g => /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u.test(g);
+
+  function tokenize(body) {
+    const lines = [];
+    for (let text of body.split('\n')) {
+      const solo = text.match(/^\s*\{pause\s+([\d.]+)\s*\}\s*$/i);
+      if (solo) { lines.push({ pause: +solo[1] }); continue; }
+      const line = { right: false, items: [] };
+      if (/^\s*>/.test(text)) { line.right = true; text = text.replace(/^\s*>\s?/, ''); }
+      text.split(/(\{pause\s+[\d.]+\s*\})/i).forEach(part => {
+        const p = part.match(/^\{pause\s+([\d.]+)\s*\}$/i);
+        if (p) { line.items.push({ type: 'pause', sec: +p[1] }); return; }
+        let word = '';
+        const flush = () => { if (word) { line.items.push({ type: 'word', text: word }); word = ''; } };
+        for (const { segment: g } of segmenter.segment(part)) {
+          if (g.length === 1 && g >= '!' && g <= '~' && glyphs[g]) { word += g; continue; }
+          flush();
+          if (/^\s$/.test(g)) line.items.push({ type: 'space' });
+          else if (isHan(g)) line.items.push({ type: 'han', text: g });
+          else if (isEmoji(g)) line.items.push({ type: 'emoji', text: g });
+          else line.items.push({ type: 'text', text: g });
+        }
+        flush();
+      });
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  // ---------- English glyphs (Vara font data, drawn by our own renderer) ----------
+  function prepareGlyphs() {
+    const svg = $('measure');
+    for (const code in font.c) {
+      const ch = String.fromCharCode(code);
+      const g = document.createElementNS(SVGNS, 'g');
+      const paths = font.c[code].paths.map(p => {
+        const el = document.createElementNS(SVGNS, 'path');
+        el.setAttribute('d', p.d);
+        el.setAttribute('transform', `translate(${p.mx},${-p.my})`);
+        g.appendChild(el);
+        return { d: p.d, mx: p.mx, my: p.my, el };
+      });
+      svg.appendChild(g);
+      const b = g.getBBox();
+      glyphs[ch] = { paths: paths.map(p => ({ d: p.d, mx: p.mx, my: p.my, len: p.el.getTotalLength() })), x: b.x, y: b.y, w: b.width, h: b.height };
+    }
+    // Vertical box shared by all words, so that all words sit on one baseline
+    let top = 0, bottom = 0;
+    for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz') {
+      const g = glyphs[ch]; if (!g) continue;
+      top = Math.min(top, g.y); bottom = Math.max(bottom, g.y + g.h);
+    }
+    const pad = STROKE * 2;
+    metrics = { top: top - pad, height: bottom - top + pad * 2, pad, space: font.p.space, minW: 4 };
+    svg.innerHTML = '';
+    const H = metrics.height * EM_PER_UNIT;
+    letter.style.setProperty('--H', H + 'em');
+    metrics.H = H;
+    metrics.base = -metrics.top * EM_PER_UNIT; // baseline distance from the top of the line, in em
+  }
+
+  function buildWord(text) {
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.classList.add('word');
+    const paths = [];
+    let cursor = 0;
+    for (const ch of text) {
+      const gl = glyphs[ch];
+      const extra = gl.w < metrics.minW ? (metrics.minW - gl.w) / 2 : 0;
+      const g = document.createElementNS(SVGNS, 'g');
+      g.setAttribute('transform', `translate(${cursor + extra - gl.x},0)`);
+      for (const p of gl.paths) {
+        const el = document.createElementNS(SVGNS, 'path');
+        el.setAttribute('d', p.d);
+        el.setAttribute('transform', `translate(${p.mx},${-p.my})`);
+        el.setAttribute('stroke-width', STROKE);
+        el.style.strokeDasharray = `${p.len} ${p.len + 2}`;
+        el.style.strokeDashoffset = p.len + 1;
+        g.appendChild(el);
+        paths.push({ el, len: p.len });
+      }
+      svg.appendChild(g);
+      cursor += Math.max(gl.w, metrics.minW);
+    }
+    const w = cursor + metrics.pad * 2;
+    svg.setAttribute('viewBox', `${-metrics.pad} ${metrics.top} ${w} ${metrics.height}`);
+    svg.style.width = w * EM_PER_UNIT + 'em';
+    svg.style.height = metrics.H + 'em';
+    const tok = el('span', 'tok word');
+    tok.appendChild(svg);
+
+    return {
+      el: tok,
+      async play() {
+        for (const p of paths) {
+          if (skip) return;
+          p.el.style.opacity = 1;
+          const ms = Math.max(p.len / PEN_SPEED, 25);
+          p.el.animate([{ strokeDashoffset: p.len + 1 }, { strokeDashoffset: 0 }],
+            { duration: ms / speed, easing: 'linear', fill: 'forwards' });
+          // Timer, not anim.finished: keeps the rhythm when the browser drops frames
+          await sleep(ms);
+        }
+        await sleep(GAP_WORD);
+      },
+      finish() { svg.getAnimations({ subtree: true }).forEach(a => a.cancel()); paths.forEach(p => { p.el.style.opacity = 1; p.el.style.strokeDashoffset = 0; }); },
+      reset() { svg.getAnimations({ subtree: true }).forEach(a => a.cancel()); paths.forEach(p => { p.el.style.opacity = 0; p.el.style.strokeDashoffset = p.len + 1; }); },
+    };
+  }
+
+  // ---------- Chinese (Hanzi Writer) ----------
+  function buildHan(ch) {
+    const tok = el('span', 'tok han');
+    const sizeEm = metrics.H * HAN_SIZE;
+    tok.style.width = sizeEm * 1.02 + 'em';
+    const box = el('span', 'box');
+    box.style.top = (metrics.base - sizeEm * 0.86) + 'em';
+    tok.appendChild(box);
+    const px = () => Math.round(sizeEm * parseFloat(getComputedStyle(letter).fontSize));
+    const writer = HanziWriter.create(box, ch, {
+      width: px(), height: px(), padding: 0,
+      showOutline: false, showCharacter: false,
+      strokeColor: settings.color || getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),
+      strokeAnimationSpeed: 14 * speed,
+      delayBetweenStrokes: 10 / speed,
+      charDataLoader: (c, onLoad) => onLoad(hanData[c]),
+    });
+    return {
+      el: tok, writer, px,
+      async play() {
+        await new Promise(res => writer.animateCharacter({ onComplete: res }));
+        await sleep(GAP_HAN);
+      },
+      finish() { writer.showCharacter({ duration: 0 }); },
+      reset() { writer.hideCharacter({ duration: 0 }); },
+    };
+  }
+
+  // ---------- Emoji and characters with no pen data ----------
+  function buildGlyph(text, kind) {
+    const tok = el('span', 'tok glyph ' + kind);
+    tok.textContent = text;
+    const size = kind === 'emoji' ? metrics.H * 0.52 : metrics.H * 0.55;
+    tok.style.fontSize = size + 'em';
+    // Font size changed, so convert the line values to this element's em
+    tok.style.height = metrics.H / size + 'em';
+    tok.style.padding = `0 ${kind === 'emoji' ? 0.08 : 0.02}em ${(metrics.H - metrics.base) / size - (kind === 'emoji' ? 0.14 : 0.1)}em`;
+    return {
+      el: tok,
+      async play() {
+        tok.classList.add('play');
+        await sleep(kind === 'emoji' ? 380 : 260);
+        await sleep(GAP_EMOJI);
+      },
+      finish() { tok.classList.add('done'); },
+      reset() { tok.classList.remove('play', 'done'); },
+    };
+  }
+
+  function buildSpace() {
+    const tok = el('span', 'tok space');
+    tok.style.width = metrics.space * 0.8 * EM_PER_UNIT + 'em';
+    return { el: tok, play: async () => {}, finish() {}, reset() {} };
+  }
+
+  function buildLetter(lines) {
+    letter.innerHTML = '';
+    tokens = [];
+    for (const line of lines) {
+      if (line.pause != null) { tokens.push(pauseTok(line.pause)); continue; }
+      const div = el('div', 'line' + (line.right ? ' right' : '') + (line.items.length ? '' : ' blank'));
+      letter.appendChild(div);
+      for (const it of line.items) {
+        let t;
+        if (it.type === 'pause') t = pauseTok(it.sec);
+        else if (it.type === 'word') t = buildWord(it.text);
+        else if (it.type === 'space') t = buildSpace();
+        else if (it.type === 'han' && hanData[it.text]) t = buildHan(it.text);
+        else if (it.type === 'emoji') t = buildGlyph(it.text, 'emoji');
+        else t = buildGlyph(it.text, 'text');
+        if (t.el) div.appendChild(t.el);
+        tokens.push(t);
+      }
+      tokens.push(pauseTok(GAP_LINE / 1000));
+    }
+  }
+  const pauseTok = sec => ({ play: () => sleep(sec * 1000), finish() {}, reset() {} });
+
+  // Hanzi Writer draws at a fixed pixel size: update it when the letter font size changes
+  let lastPx = 0;
+  window.addEventListener('resize', () => {
+    const fs = parseFloat(getComputedStyle(letter).fontSize);
+    if (fs === lastPx) return;
+    lastPx = fs;
+    tokens.forEach(t => t.writer && t.writer.updateDimensions({ width: t.px(), height: t.px() }));
+  });
+
+  // ---------- Playback ----------
+  function sleep(ms) {
+    return new Promise(res => {
+      if (skip) return res();
+      const id = setTimeout(res, ms / speed);
+      skipPromise.then(() => { clearTimeout(id); res(); });
+    });
+  }
+
+  function follow(t) {
+    if (!t.el) return;
+    const r = t.el.getBoundingClientRect();
+    if (r.bottom > innerHeight - 90) window.scrollBy({ top: r.bottom - innerHeight * 0.6, behavior: 'smooth' });
+  }
+
+  async function play() {
+    playing = true; skip = false;
+    skipPromise = new Promise(res => (skipResolve = res));
+    $('replay').classList.remove('shown');
+    for (const t of tokens) {
+      if (skip) break;
+      follow(t);
+      await Promise.race([t.play(), skipPromise]);
+    }
+    tokens.forEach(t => t.finish());
+    playing = false;
+    celebrate();
+    setTimeout(() => $('replay').classList.add('shown'), 1200);
+  }
+
+  function celebrate() {
+    if (typeof confetti !== 'function') return;
+    const colors = ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#c77dff'];
+    confetti({ particleCount: 140, spread: 80, origin: { y: 0.7 }, colors });
+    setTimeout(() => confetti({ particleCount: 70, angle: 60, spread: 60, origin: { x: 0, y: 0.8 }, colors }), 250);
+    setTimeout(() => confetti({ particleCount: 70, angle: 120, spread: 60, origin: { x: 1, y: 0.8 }, colors }), 400);
+  }
+
+  letter.addEventListener('click', () => {
+    if (playing && !skip) { skip = true; skipResolve(); }
+  });
+  $('replay').addEventListener('click', () => {
+    tokens.forEach(t => t.reset());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(play, 600);
+  });
+
+  // ---------- Startup ----------
+  function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function fail(text) { scene.style.display = 'none'; $('msg').textContent = text; $('msg').classList.add('shown'); }
+
+  async function load() {
+    const res = await fetch('config.txt', { cache: 'no-cache' });
+    if (!res.ok) throw new Error('config.txt not found');
+    const cfg = parseConfig(await res.text());
+    settings = cfg.settings;
+
+    if (settings.to) $('to').textContent = 'To: ' + settings.to;
+    if (settings.title) document.title = settings.title;
+    if (settings.color) document.documentElement.style.setProperty('--ink', settings.color);
+    const bg = (settings.background || 'paper').trim();
+    if (bg.toLowerCase() === 'paper') letter.classList.add('paper');
+    else letter.style.backgroundColor = bg;
+    speed = Math.max(0.1, parseFloat(settings.speed) || 1);
+
+    const fontKey = (settings.font || 'satisfy').toLowerCase().replace(/[\s_-]/g, '');
+    font = await fetch(VARA_FONTS[fontKey] || VARA_FONTS.satisfy).then(r => r.json());
+    prepareGlyphs();
+
+    const hanChars = [...new Set([...cfg.body].filter(isHan))];
+    await Promise.all(hanChars.map(c =>
+      fetch(HANZI_DATA(c)).then(r => (r.ok ? r.json() : null)).catch(() => null)
+        .then(d => { if (d) hanData[c] = d; })));
+
+    buildLetter(tokenize(cfg.body));
+  }
+
+  const ready = load().catch(err => {
+    console.error(err);
+    if (location.protocol === 'file:')
+      fail('Open this page through a web server (for example: npx serve), not as a file.');
+    else
+      fail('Sorry, the letter could not load. Please refresh the page.');
+    throw err;
+  });
+
+  let opened = false;
+  scene.addEventListener('click', async () => {
+    if (opened) return;
+    opened = true;
+    scene.classList.add('opening');
+    const anim = new Promise(res => setTimeout(res, 1600));
+    $('hint').textContent = '';
+    try { await Promise.all([ready, anim]); } catch { return; }
+    scene.classList.add('gone');
+    letter.classList.add('shown');
+    lastPx = parseFloat(getComputedStyle(letter).fontSize);
+    setTimeout(play, 700);
+  });
+})();
+</script>
+</body>
+</html>

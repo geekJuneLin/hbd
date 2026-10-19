@@ -1,0 +1,15 @@
+to: Tester
+title: A test letter
+font: Satisfy
+color: #1f2a5a
+background: paper
+speed: 1.0
+---
+Dear Tester,
+
+This is a test letter. 📱✨
+It checks English words, emoji and Chinese.
+测试一下，手写动画效果！
+{pause 1.5}
+Happy Birthday! 🎂🎉
+> Love, Chloe ❤️

@@ -1,15 +1,20 @@
-to: Tester
-title: A test letter
+to: 宝宝覃
+title: 长尾巴快乐🎉
 font: Satisfy
 color: #1f2a5a
 background: paper
 speed: 1.0
 ---
-Dear Tester,
+吾妻覃宝,
 
-This is a test letter. 📱✨
-It checks English words, emoji and Chinese.
-测试一下，手写动画效果！
+今天的你又步入新的一岁啦，当然在包子心里你永远都是18岁！
+一直都是我心里的那个小女孩👧
+
+我替我的宝宝向幸运女神许愿🙏 
+虽然是年纪增长，希望苦恼，烦恼，苦难不长
+但是财富，快乐，健康，幸福增长
+霉运走开，幸运多多降临！
+
 {pause 1.5}
 Happy Birthday! 🎂🎉
-> Love, Chloe ❤️
+> 你的蠢臭包子 ❤️
